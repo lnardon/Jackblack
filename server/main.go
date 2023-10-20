@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,6 +52,7 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	http.Handle("/", http.FileServer(http.Dir("../frontend/dist")))
 	http.HandleFunc("/ws", serveWs)
 	server := &http.Server{
 		Addr:              *addr,
@@ -62,36 +64,41 @@ func main() {
 }
 
 func eventsHandler(event_name string, ws *websocket.Conn) {
-	switch event_name {
+	switch strings.Split(event_name, ":")[0] {
 	case "create_room":
-		roomID := fmt.Sprintf("%d", time.Now().UnixNano())
+		roomID := time.Now().Format("20060102150405")
 		mutex.Lock()
 		rooms[roomID] = []*websocket.Conn{ws}
 		mutex.Unlock()
-
-    fmt.Println("--- Room Created ---")
-
 		ws.WriteMessage(websocket.TextMessage, []byte("room_created:"+roomID))
+		
+		fmt.Println("--- Room Created ---")
 	case "join_room":
 		roomID := event_name[len("join_room:"):]
 		mutex.Lock()
 		if clients, ok := rooms[roomID]; ok {
 			rooms[roomID] = append(clients, ws)
+			ws.WriteMessage(websocket.TextMessage, []byte("room_joined"))
+			fmt.Println("--- Room Joined " + roomID + " ---")
 		}
 		mutex.Unlock()
+  	case "get_all_rooms":
+		all_rooms := []string{}
+		// mutex.Lock()
+		for name := range rooms {
+			all_rooms = append(all_rooms,name)
+		}
+		// mutex.Unlock()
+		var x = []byte{}
 
-    fmt.Println("--- Room Joined ---")
-
-		ws.WriteMessage(websocket.TextMessage, []byte("room_joined"))
-  // case "get_all_rooms":
-  //   all_rooms := []string{}
-	// 	mutex.Lock()
-  //   for name, _ := range rooms {
-  //     all_rooms = append(all_rooms,name)
-  //   }
-	// 	mutex.Unlock()
-    
-	// 	ws.WriteMessage(websocket.TextMessage, []byte(all_rooms))
+		for i:=0; i<len(all_rooms); i++{
+			b := []byte(all_rooms[i])
+			for j:=0; j<len(b); j++{
+				x = append(x,b[j])
+			}
+		}
+		fmt.Println("Room 1: " + all_rooms[0])
+		ws.WriteMessage(websocket.TextMessage, x)
   }
 }
 

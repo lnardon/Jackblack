@@ -1,4 +1,5 @@
 <script>
+  export let setCurrentRoom;
   const conn = new WebSocket("ws://localhost:8080/ws");
   
   conn.onclose = (evt) => {
@@ -7,6 +8,7 @@
 
   conn.onmessage = (evt) => {
     console.log('MESSAGE RECEIVED', evt.data);
+    setCurrentRoom(evt.data)
   }
 
   function createRoom(){
@@ -15,7 +17,11 @@
 
   function joinRoom(){
     let roomId = prompt("Enter room id")
-     conn.send(`join_room:${roomId}`)
+     conn.send("join_room:"+roomId)
+  }
+
+  function getAllRooms(){
+    conn.send("get_all_rooms")
   }
 
 </script>
@@ -26,5 +32,8 @@
   </button>
   <button on:click={createRoom}>
     Create room
+  </button>
+  <button on:click={getAllRooms}>
+    Get rooms
   </button>
 </div>
