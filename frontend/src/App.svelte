@@ -1,6 +1,13 @@
 <script>
-  import svelteLogo from './assets/svelte.svg'
+  import svelteLogo from '../public/assets/svelte.svg'
   import Counter from './lib/Counter.svelte'
+  import Cards from './lib/Cards.svelte';
+
+  let currentRoom = 0;
+
+  function setCurrentRoom(roomId){
+    currentRoom = roomId;
+  }
 </script>
 
 <main>
@@ -12,7 +19,11 @@
   <h1>Jackblack (Online Blackjack)</h1>
 
   <div class="card">
-    <Counter />
+    {#if currentRoom == 0}
+    <Counter setCurrentRoom={setCurrentRoom}/>
+    {:else}
+    <Cards />
+    {/if}
   </div>
 
 </main>
