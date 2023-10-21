@@ -66,6 +66,11 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+.cards_container {
+  width: 100%;
+  display: flex;
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;
