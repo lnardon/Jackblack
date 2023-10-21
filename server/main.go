@@ -4,7 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -64,7 +66,8 @@ func main() {
 }
 
 func eventsHandler(event_name string, ws *websocket.Conn) {
-	switch strings.Split(event_name, ":")[0] {
+  currentGame := Game{}
+  switch strings.Split(event_name, ":")[0] {
 	case "create_room":
 		roomID := time.Now().Format("20060102150405")
 		mutex.Lock()
@@ -82,13 +85,13 @@ func eventsHandler(event_name string, ws *websocket.Conn) {
 			fmt.Println("--- Room Joined " + roomID + " ---")
 		}
 		mutex.Unlock()
-  	case "get_all_rooms":
+  case "get_all_rooms":
 		all_rooms := []string{}
-		// mutex.Lock()
+		mutex.Lock()
 		for name := range rooms {
 			all_rooms = append(all_rooms,name)
 		}
-		// mutex.Unlock()
+		mutex.Unlock()
 		var x = []byte{}
 
 		for i:=0; i<len(all_rooms); i++{
@@ -99,6 +102,10 @@ func eventsHandler(event_name string, ws *websocket.Conn) {
 		}
 		fmt.Println("Room 1: " + all_rooms[0])
 		ws.WriteMessage(websocket.TextMessage, x)
+  case "start_game":
+    fmt.Println("START")
+    card := currentGame.getRandomCard()
+    ws.WriteMessage(websocket.TextMessage, []byte(strconv.Itoa(card)))
   }
 }
 
@@ -113,5 +120,24 @@ func broadcast(roomID string, message []byte) {
 
 	for _, client := range clients {
 		client.WriteMessage(websocket.TextMessage, message)
+    fmt.Println(message)
 	}
+}
+
+type Game struct {
+  currentPlayer string
+  allCards [52]string
+}
+
+func (g *Game)setCurrentPlayer(id string){
+  g.currentPlayer = id 
+}
+
+func (g *Game)getRandomCard() (int) {
+  randNumber := rand.Intn(52)
+  return randNumber
+}
+
+func (g *Game)ping(){
+  fmt.Println("Flong",g.currentPlayer)
 }
