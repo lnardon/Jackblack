@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +11,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/lnardon/Jackblack/server/RoomManager"
+	"github.com/lnardon/Jackblack/server/game"
 )
 
 const (
@@ -27,7 +28,7 @@ var (
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 	}
-	rooms = make(map[string][]*websocket.Conn)
+	rooms = make(map[string]*RoomManager.RoomManager)
 	mutex sync.RWMutex
 )
 
@@ -41,14 +42,19 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
+	currentGame := &game.Game{
+		HasGameStarted : false,
+		CurrentPlayer : "Dealer",
+	}
+
 	for {
 		msgType, p, err := ws.ReadMessage()
 		if err != nil {
-			return
+		return
 		}
 
 		if msgType == websocket.TextMessage {
-			eventsHandler(string(p), ws)
+		eventsHandler(string(p), ws, currentGame)
 		}
 	}
 }
@@ -65,79 +71,55 @@ func main() {
 	}
 }
 
-func eventsHandler(event_name string, ws *websocket.Conn) {
-  currentGame := Game{}
-  switch strings.Split(event_name, ":")[0] {
-	case "create_room":
-		roomID := time.Now().Format("20060102150405")
-		mutex.Lock()
-		rooms[roomID] = []*websocket.Conn{ws}
-		mutex.Unlock()
-		ws.WriteMessage(websocket.TextMessage, []byte("room_created:"+roomID))
-		
-		fmt.Println("--- Room Created ---")
-	case "join_room":
-		roomID := event_name[len("join_room:"):]
-		mutex.Lock()
-		if clients, ok := rooms[roomID]; ok {
-			rooms[roomID] = append(clients, ws)
-			ws.WriteMessage(websocket.TextMessage, []byte("room_joined"))
-			fmt.Println("--- Room Joined " + roomID + " ---")
-		}
-		mutex.Unlock()
-  case "get_all_rooms":
-		all_rooms := []string{}
-		mutex.Lock()
-		for name := range rooms {
-			all_rooms = append(all_rooms,name)
-		}
-		mutex.Unlock()
-		var x = []byte{}
+func eventsHandler(event_name string, ws *websocket.Conn, currentGame *game.Game) {
+	switch strings.Split(event_name, ":")[0] {
+		case "create_room":
+			roomID := string(event_name[len("create_room:"):])
 
-		for i:=0; i<len(all_rooms); i++{
-			b := []byte(all_rooms[i])
-			for j:=0; j<len(b); j++{
-				x = append(x,b[j])
+			fmt.Println(roomID)
+			rooms[roomID] = &RoomManager.RoomManager{
+				RoomId: roomID,
+				RoomSize: "8",
+				AllPlayers: make(map[string]*websocket.Conn),
 			}
-		}
-		fmt.Println("Room 1: " + all_rooms[0])
-		ws.WriteMessage(websocket.TextMessage, x)
-  case "start_game":
-    fmt.Println("START")
-    card := currentGame.getRandomCard()
-    ws.WriteMessage(websocket.TextMessage, []byte(strconv.Itoa(card)))
-  }
-}
+			ws.WriteMessage(websocket.TextMessage, []byte("room_created:"+roomID))
+			rooms[roomID].JoinRoom(ws, []byte(ws.RemoteAddr().String()))
+			fmt.Println("--- Room Created ---")
+		case "join_room":
+			roomID := string(event_name[len("join_room:"):])
+			currentRoom := rooms[roomID]
+			fmt.Println(roomID)
+			currentRoom.JoinRoom(ws, []byte(ws.RemoteAddr().String()))
+		case "get_all_rooms":
+			all_rooms := []string{}
+			mutex.Lock()
+			for name := range rooms {
+				all_rooms = append(all_rooms,name)
+			}
+			mutex.Unlock()
+			var x = []byte{}
 
-func broadcast(roomID string, message []byte) {
-	mutex.RLock()
-	clients, ok := rooms[roomID]
-	mutex.RUnlock()
-
-	if !ok {
-		return
-	}
-
-	for _, client := range clients {
-		client.WriteMessage(websocket.TextMessage, message)
-    fmt.Println(message)
-	}
-}
-
-type Game struct {
-  currentPlayer string
-  allCards [52]string
-}
-
-func (g *Game)setCurrentPlayer(id string){
-  g.currentPlayer = id 
-}
-
-func (g *Game)getRandomCard() (int) {
-  randNumber := rand.Intn(52)
-  return randNumber
-}
-
-func (g *Game)ping(){
-  fmt.Println("Flong",g.currentPlayer)
+			for i:=0; i<len(all_rooms); i++{
+				b := []byte(all_rooms[i])
+				for j:=0; j<len(b); j++{
+					x = append(x,b[j])
+				}
+			}
+			fmt.Println("Room 1: " + all_rooms[0])
+			ws.WriteMessage(websocket.TextMessage, x)
+		case "start_game":
+			fmt.Println("START")
+			currentGame.CurrentPlayer = "2"
+			currentGame.HasGameStarted = true
+		case "handle_game":
+			if(currentGame.HasGameStarted){
+				fmt.Println("HANDLE GAME")
+				if strings.Split(event_name, ":")[2] == "draw_card" {
+					roomID := strings.Split(event_name, ":")[1]
+					card := currentGame.GetRandomCard()
+					rooms[roomID].Broadcast(ws,[]byte(strconv.Itoa(card)))
+					 ws.WriteMessage(websocket.TextMessage,[]byte(strconv.Itoa(card)))
+				}
+			}
+  	}
 }
