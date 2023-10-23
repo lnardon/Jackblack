@@ -117,8 +117,8 @@ func eventsHandler(event_name string, ws *websocket.Conn, currentGame *game.Game
 				if strings.Split(event_name, ":")[2] == "draw_card" {
 					roomID := strings.Split(event_name, ":")[1]
 					card := currentGame.GetRandomCard()
-					rooms[roomID].Broadcast(ws,[]byte(strconv.Itoa(card)))
-					 ws.WriteMessage(websocket.TextMessage,[]byte(strconv.Itoa(card)))
+                    rooms[roomID].Broadcast(ws,[]byte("card:"+strconv.Itoa(card)))
+                ws.WriteMessage(websocket.TextMessage,[]byte("card:"+strconv.Itoa(card)))
 				}
 			}
   	}
